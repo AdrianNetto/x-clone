@@ -17,25 +17,31 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { app } from "@/firebase";
-import { modalState } from "@/atom/modalAtom";
+import { modalState, postIdState } from "@/atom/modalAtom";
 import { useRecoilState } from "recoil";
 
 export default function Icons({ id, uid }) {
   const [isLiked, setIsLiked] = useState(false);
   const [likes, setLikes] = useState([]);
   const [open, setOpen] = useRecoilState(modalState);
+  const [postId, setPostId] = useRecoilState(postIdState);
 
   const { data: session } = useSession();
   const db = getFirestore(app);
+
   const likePost = async () => {
     if (session) {
-      if (isLiked) {
-        await deleteDoc(doc(db, "posts", id, "likes", session?.user.id));
-      } else {
-        await setDoc(doc(db, "posts", id, "likes", session.user.id), {
-          username: session.user.username,
-          timestamp: serverTimestamp(),
-        });
+      try {
+        if (isLiked) {
+          await deleteDoc(doc(db, "posts", id, "likes", session.user.id));
+        } else {
+          await setDoc(doc(db, "posts", id, "likes", session.user.id), {
+            username: session.user.username,
+            timestamp: serverTimestamp(),
+          });
+        }
+      } catch (error) {
+        console.error("Error updating likes: ", error);
       }
     } else {
       signIn();
@@ -43,26 +49,32 @@ export default function Icons({ id, uid }) {
   };
 
   useEffect(() => {
-    onSnapshot(collection(db, "posts", id, "likes"), (snapshot) => {
-      setLikes(snapshot.docs);
-    });
-  }, [db]);
+    const unsubscribe = onSnapshot(
+      collection(db, "posts", id, "likes"),
+      (snapshot) => {
+        setLikes(snapshot.docs);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [db, id]);
 
   useEffect(() => {
-    setIsLiked(likes.findIndex((like) => like.id === session?.user?.id) !== -1);
-  }, [likes]);
+    if (session) {
+      setIsLiked(likes.findIndex((like) => like.id === session.user.id) !== -1);
+    }
+  }, [likes, session]);
 
   const deletePost = async () => {
-    if (window.confirm("Are you sure you want to delete this post?")) {
-      if (session?.user?.id !== uid) {
-        deleteDoc(doc(db, "posts", id))
-          .then(() => {
-            console.log("Document successfully deleted!");
-            window.location.reload();
-          })
-          .catch((error) => {
-            console.error("Error removing document: ", error);
-          });
+    if (session?.user?.id === uid) {
+      if (window.confirm("Are you sure you want to delete this post?")) {
+        try {
+          await deleteDoc(doc(db, "posts", id));
+          console.log("Document successfully deleted!");
+          window.location.reload();
+        } catch (error) {
+          console.error("Error removing document: ", error);
+        }
       }
     } else {
       alert("You are not authorized to delete this post.");
