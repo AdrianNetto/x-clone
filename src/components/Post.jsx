@@ -4,7 +4,7 @@ import { HiDotsHorizontal } from 'react-icons/hi'
 
 export default function Post({post, id}) {
   return (
-    <div className='flex p-3 border-b border-gray-200'>
+    <div className='flex p-3 border-b border-gray-200 hover:bg-gray-50'>
       <img src={post?.profileImg} alt="user image" className='h-11 w-11 rounded-full mr-4'/>
       <div className="flex-1">
         <div className="flex items-center justify-between">
