@@ -7,15 +7,20 @@ import {
   ref,
   uploadBytesResumable,
   getDownloadURL,
+  
 } from "firebase/storage";
 import { app } from "@/firebase";
+import { addDoc, collection, serverTimestamp, getFirestore } from "firebase/firestore";
 
 export default function Input() {
   const [imageFileUrl, setImageFileUrl] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [imageFileUploading, setimageFileUploading] = useState(false);
+  const [imageFileUploading, setImageFileUploading] = useState(false);
+  const [text, setText] = useState("");
+  const [postLoading, setPostLoading] = useState(false);
   const { data: session } = useSession();
   const imagePicRef = useRef();
+  const db = getFirestore(app);
 
   const addImageToPost = (e) => {
     const file = e.target.files[0];
@@ -26,8 +31,13 @@ export default function Input() {
     }
   };
 
+  const removeImageFromPost = () => {
+    setSelectedFile(null);
+    setImageFileUrl(null);
+  };
+
   const uploadImageToStorage = () => {
-    setimageFileUploading(true);
+    setImageFileUploading(true);
     const storage = getStorage(app);
     const fileName = new Date().getTime() + "-" + selectedFile.name;
     const storageRef = ref(storage, fileName);
@@ -40,17 +50,34 @@ export default function Input() {
         console.log("Upload is " + progress + "% done");
       },
       (error) => {
-        setimageFileUploading(false);
+        setImageFileUploading(false);
         setImageFileUrl(null);
-        selectedFile(null);
+        setSelectedFile(null);
       },
       () => {
         getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
           setImageFileUrl(downloadURL);
-          setimageFileUploading(false);
+          setImageFileUploading(false);
         });
       }
     );
+  };
+
+  const handleSubmit = async () => {
+    setPostLoading(true);
+    const docRef = await addDoc(collection(db, 'posts'), {
+      uid: session.user.id || null,
+      name: session.user.name || null,
+      username: session.user.username || null,
+      text: text || null,
+      profileImg: session.user.image || null,
+      timestamp: serverTimestamp() || null,
+      image: imageFileUrl || null,
+    });
+    setPostLoading(false);
+    setText('');
+    setImageFileUrl(null);
+    setSelectedFile(null);
   };
 
   useEffect(() => {
@@ -72,13 +99,23 @@ export default function Input() {
           placeholder="What's happening?"
           rows="2"
           className="w-full border-none outline-none tracking-wide min-h-[50px] text-gray-700"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
         />
         {selectedFile && (
-          <img
-            src={imageFileUrl}
-            alt="image"
-            className="w-full max-h-[250px] object-cover cursor-pointer"
-          />
+          <div className="relative">
+            <img
+              src={imageFileUrl}
+              alt="image"
+              className={`w-full max-h-[250px] object-cover cursor-pointer ${imageFileUploading ? 'animate-pulse' : ''}`}
+            />
+            <button
+              onClick={removeImageFromPost}
+              className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full font-bold shadow-md hover:bg-red-600"
+            >
+              Remove
+            </button>
+          </div>
         )}
         <div className="flex items-center justify-between pt-2.5">
           <HiOutlinePhotograph
@@ -92,7 +129,11 @@ export default function Input() {
             onChange={addImageToPost}
             hidden
           />
-          <button className="bg-blue-400 text-white px-4 py-1.5 rounded-full font-bold shadow-md hover:brightness-95 disabled:opacity-50">
+          <button
+            disabled={text.trim() === '' || postLoading || imageFileUploading}
+            className="bg-blue-400 text-white px-4 py-1.5 rounded-full font-bold shadow-md hover:brightness-95 disabled:opacity-50"
+            onClick={handleSubmit}
+          >
             Post
           </button>
         </div>
