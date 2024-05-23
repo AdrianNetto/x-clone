@@ -16,7 +16,7 @@ export default function Input() {
       />
       <div className="w-full divide-y divide-gray-200">
         <textarea
-          placeholder="What is happening?"
+          placeholder="What's happening?"
           rows="2"
           className="w-full border-none outline-none tracking-wide min-h-[50px] text-gray-700"
         />
